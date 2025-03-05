@@ -5,6 +5,32 @@ This project is a simple server demo implemented in Go, showcasing a typical pro
 
 ## Project Directory Structure
 
+```bash
+.
+├── cmd
+│   └── main.go            # Application entry point
+├── config
+│   └── config.yaml        # Configuration file
+├── database.sql           # Database schema or initialization script
+├── go.mod                 # Go module definition
+├── go.sum                 # Go module dependencies
+├── internal               # Internal application logic
+│   ├── api                # API layer (controllers)
+│   ├── config             # Configuration handling
+│   ├── database           # Database connection and initialization
+│   ├── models             # Data models
+│   ├── repository         # Data access layer (repositories)
+│   ├── service            # Business logic layer (services)
+│   └── utils              # Utility functions and helpers
+├── logs
+│   └── 2025-03-05.log     # Application log files
+├── pkg
+│   └── errors             # Custom error handling package
+└── tmp
+    ├── build-errors.log   # Build error logs
+    └── main               # Temporary build output
+```
+
 ### Root Directory
 - **go.mod**: The Go module file that manages project dependencies.
 - **go.sum**: The Go checksum file ensuring the integrity and consistency of dependencies.
