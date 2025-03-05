@@ -38,8 +38,8 @@ This directory contains the core business logic of the server, divided into seve
 
 1. Clone the project:
    ```bash
-   git clone https://your-repo-url
-   cd your-repo-directory
+   git clone https://github.com/Hansoncoder/service-for-go
+   cd service-for-go
    ```
 
 2. Configure the database:

@@ -12,32 +12,36 @@ import (
 )
 
 func main() {
-	// 加载配置
+	// Load configuration from the YAML file
 	cfg, err := configs.Load("config/config.yaml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// 初始化数据库
+	// Initialize the database connection
 	if err := database.Init(cfg.Database); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer database.Close()
+	defer database.Close() // Ensure the database connection is closed when the application exits
 
-	// 初始化数据访问层
+	// Initialize the repository layer (Data Access Layer)
 	userRepo := repository.NewUserRepository(database.GetDB())
 
-	// 初始化业务逻辑层
+	// Initialize the service layer (Business Logic Layer)
 	userService := service.NewUserService(userRepo)
 
-	// 初始化 API 层
+	// Initialize the API layer (Controller Layer)
 	accountAPI := v1.NewAccountAPI(userService)
 	userAPI := v1.NewUserAPI(userService)
 
-	// 启动 HTTP 服务器
+	// Start the HTTP server using the Gin framework
 	router := gin.Default()
+
+	// Set up API routes
 	v1.SetupAccountRouter(router, accountAPI)
 	v1.SetupUserRouter(router, userAPI)
+
+	// Run the server on port 8080
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
