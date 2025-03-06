@@ -92,14 +92,29 @@ func (l *Logger) Info(msg string) {
 	l.logToFile("INFO", msg)
 }
 
+// Infof logs a formatted informational message
+func (l *Logger) Infof(format string, args ...interface{}) {
+	l.logToFile("INFO", fmt.Sprintf(format, args...))
+}
+
 // Warn logs a warning message
 func (l *Logger) Warn(msg string) {
 	l.logToFile("WARN", msg)
 }
 
+// Warnf logs a formatted warning message
+func (l *Logger) Warnf(format string, args ...interface{}) {
+	l.logToFile("WARN", fmt.Sprintf(format, args...))
+}
+
 // Error logs an error message
 func (l *Logger) Error(msg string) {
 	l.logToFile("ERROR", msg)
+}
+
+// Errorf logs a formatted error message
+func (l *Logger) Errorf(format string, args ...interface{}) {
+	l.logToFile("ERROR", fmt.Sprintf(format, args...))
 }
 
 // Close closes the log file

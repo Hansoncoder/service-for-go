@@ -1,11 +1,25 @@
 package v1
 
 import (
-	"veo/internal/api/resp"
+	"veo/internal/api/common"
 	"veo/internal/service"
-	CustomError "veo/pkg/errors"
+	"veo/pkg/errors"
 
 	"github.com/gin-gonic/gin"
+)
+
+// 导入 common 包中的函数到当前包
+var (
+	ParseRequest   = common.ParseRequest
+	ParseQuery     = common.ParseQuery
+	ParseForm      = common.ParseForm
+	AbortIfError   = common.AbortIfError
+	RespondData    = common.RespondData
+	RespondMessage = common.RespondMessage
+	GenerateJWT    = common.GenerateJWT
+	AuthMiddleware = common.AuthMiddleware
+	NewUserExists  = errors.NewUserExists
+	NewAuthFailed  = errors.NewAuthFailed
 )
 
 // AccountAPI handles user authentication and account management
@@ -27,7 +41,7 @@ func SetupAccountRouter(router *gin.Engine, api *AccountAPI) {
 	protected.POST("/login", api.Login)
 
 	// Protected endpoints (Require JWT authentication)
-	protected.Use(service.AuthMiddleware())
+	protected.Use(AuthMiddleware())
 	{
 		protected.POST("/updatePassword", api.UpdatePassword)
 	}
@@ -35,100 +49,66 @@ func SetupAccountRouter(router *gin.Engine, api *AccountAPI) {
 
 // Register handles user registration
 func (api *AccountAPI) Register(c *gin.Context) {
-	var request struct {
+	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-
-	// Validate JSON input
-	if err := c.ShouldBindJSON(&request); err != nil {
-		resp.JSONResponse(c, nil, CustomError.NewError(CustomError.CodeInvalidParams, "Invalid request format"))
+	if !ParseRequest(c, &req) {
 		return
 	}
 
-	// Register the user
-	err := api.userService.Register(request.Username, request.Password)
-	if err != nil {
-		resp.JSONResponse(c, nil, err)
+	user, err := api.userService.Register(req.Username, req.Password)
+	if AbortIfError(c, err) {
 		return
 	}
 
-	// Retrieve the newly registered user
-	user, err := api.userService.GetUserByUsername(request.Username)
-	if err != nil {
-		resp.JSONResponse(c, nil, err)
+	token, err := GenerateJWT(user.ID, user.Username)
+	if AbortIfError(c, err) {
 		return
 	}
 
-	// Generate JWT token for authentication
-	token, err := service.GenerateJWT(user.ID, user.Username)
-	if err != nil {
-		resp.JSONResponse(c, nil, CustomError.NewError(CustomError.CodeError, "Failed to generate authentication token"))
-		return
-	}
-
-	resp.JSONResponse(c, token, nil)
+	RespondData(c, token)
 }
 
 // Login handles user authentication
 func (api *AccountAPI) Login(c *gin.Context) {
-	var request struct {
+	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
 
-	// Validate JSON input
-	if err := c.ShouldBindJSON(&request); err != nil {
-		resp.JSONResponse(c, nil, CustomError.NewError(CustomError.CodeInvalidParams, "Invalid request format"))
+	if !ParseRequest(c, &req) {
 		return
 	}
 
-	// Authenticate user
-	user, err := api.userService.Login(request.Username, request.Password)
-	if err != nil {
-		resp.JSONResponse(c, nil, err)
+	user, err := api.userService.Login(req.Username, req.Password)
+	if AbortIfError(c, err) {
 		return
 	}
 
-	// Generate JWT token
-	token, err := service.GenerateJWT(user.ID, user.Username)
-	if err != nil {
-		resp.JSONResponse(c, nil, CustomError.NewError(CustomError.CodeError, "Failed to generate authentication token"))
+	token, err := GenerateJWT(user.ID, user.Username)
+	if AbortIfError(c, err) {
 		return
 	}
 
-	resp.JSONResponse(c, token, nil)
+	RespondData(c, token)
 }
 
 // UpdatePassword allows users to change their password
 func (api *AccountAPI) UpdatePassword(c *gin.Context) {
-	var request struct {
+	var req struct {
 		OldPassword string `json:"oldPassword"`
 		NewPassword string `json:"newPassword"`
 	}
 
-	// Validate JSON input
-	if err := c.ShouldBindJSON(&request); err != nil {
-		resp.JSONResponse(c, nil, CustomError.NewError(CustomError.CodeInvalidParams, "Invalid request format"))
+	if !ParseRequest(c, &req) {
 		return
 	}
 
-	// Get user ID from JWT claims
 	id := c.MustGet("userId").(int)
-
-	// Fetch user details
-	user, err := api.userService.GetUserByID(id)
-	if err != nil {
-		resp.JSONResponse(c, nil, err)
+	if AbortIfError(c, api.userService.UpdatePassword(id, req.OldPassword, req.NewPassword)) {
 		return
 	}
 
-	// Attempt password update
-	err = api.userService.UpdatePassword(user.ID, request.OldPassword, request.NewPassword)
-	if err != nil {
-		resp.JSONResponse(c, nil, err)
-		return
-	}
-
-	resp.JSONResponse(c, "Password updated successfully", nil)
+	RespondMessage(c, "Password updated successfully")
 }

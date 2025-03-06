@@ -1,26 +1,28 @@
 package main
 
 import (
-	"log"
 	v1 "veo/internal/api/v1"
-	configs "veo/internal/config"
+	"veo/internal/configs"
 	"veo/internal/database"
 	"veo/internal/repository"
 	"veo/internal/service"
+	"veo/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
+
+var logger = utils.GetLogger()
 
 func main() {
 	// Load configuration from the YAML file
 	cfg, err := configs.Load("config/config.yaml")
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		logger.Errorf("Failed to load config: %v", err)
 	}
 
 	// Initialize the database connection
 	if err := database.Init(cfg.Database); err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		logger.Errorf("Failed to initialize database: %v", err)
 	}
 	defer database.Close() // Ensure the database connection is closed when the application exits
 
@@ -43,6 +45,6 @@ func main() {
 
 	// Run the server on port 8080
 	if err := router.Run(":8080"); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		logger.Errorf("Failed to start server: %v", err)
 	}
 }

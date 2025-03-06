@@ -2,9 +2,9 @@ package database
 
 import (
 	"fmt"
-	"log"
 	"sync"
-	configs "veo/internal/config"
+	"veo/internal/configs"
+	"veo/internal/utils"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -14,6 +14,8 @@ var (
 	db   *gorm.DB  // Global database connection instance
 	once sync.Once // Ensures database initialization happens only once
 )
+
+var logger = utils.GetLogger()
 
 // Init initializes the database connection using the provided configuration.
 func Init(config configs.DBConfig) error {
@@ -33,14 +35,14 @@ func Init(config configs.DBConfig) error {
 		// Open a connection to the database
 		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 		if err != nil {
-			initErr = fmt.Errorf("failed to connect to database: %v", err)
+			logger.Errorf("failed to connect to database: %v", err)
 			return
 		}
 
 		// Retrieve the underlying *sql.DB object
 		sqlDB, err := db.DB()
 		if err != nil {
-			initErr = fmt.Errorf("failed to get DB object: %v", err)
+			logger.Errorf("failed to get DB object: %v", err)
 			return
 		}
 
@@ -48,8 +50,7 @@ func Init(config configs.DBConfig) error {
 		sqlDB.SetMaxIdleConns(10)   // Set the maximum number of idle connections
 		sqlDB.SetMaxOpenConns(100)  // Set the maximum number of open connections
 		sqlDB.SetConnMaxLifetime(0) // Disable connection timeout
-
-		log.Println("Database connected successfully")
+		logger.Info("Database connected successfully")
 	})
 	return initErr
 }
@@ -67,11 +68,11 @@ func Close() {
 
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Printf("Failed to get DB object: %v", err)
+		logger.Errorf("Failed to get DB object: %v", err)
 		return
 	}
 
 	if err := sqlDB.Close(); err != nil {
-		log.Printf("Failed to close database connection: %v", err)
+		logger.Errorf("Failed to close database connection: %v", err)
 	}
 }

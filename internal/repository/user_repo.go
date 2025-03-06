@@ -1,106 +1,75 @@
 package repository
 
 import (
-	"errors"
 	"veo/internal/models"
-	CustomError "veo/pkg/errors"
+	"veo/internal/utils"
+	"veo/pkg/errors"
 
 	"gorm.io/gorm"
 )
 
-// UserRepository defines methods for user data operations.
-type UserRepository interface {
-	GetUserByUserID(id int) (*models.User, error)            // Retrieve user by ID
-	GetUserByUsername(username string) (*models.User, error) // Retrieve user by username
-	UpdateUser(user *models.User) error                      // Update user information
-	UpdatePassword(id int, password string) error            // Update user password
-	DeleteUser(id int) error                                 // Delete user by ID
+var logger = utils.GetLogger()
+var NewUserNotFound = errors.NewUserNotFound
+
+// UserRepository handles database operations for users
+type UserRepository struct {
+	db *gorm.DB
 }
 
-// userRepo is an implementation of UserRepository.
-type userRepo struct {
-	db *gorm.DB // Database instance,
+// NewUserRepository creates a new instance of UserRepository
+func NewUserRepository(db *gorm.DB) *UserRepository {
+	return &UserRepository{db: db}
 }
 
-// NewUserRepository creates a new instance of UserRepository.
-func NewUserRepository(db *gorm.DB) UserRepository {
-	return &userRepo{db: db}
-}
-
-// GetUserByUserID retrieves a user by their ID.
-func (r *userRepo) GetUserByUserID(id int) (*models.User, error) {
-	var user models.User
-	err := r.db.Where("ID = ?", id).First(&user).Error
-	if err != nil {
-		// Handle case when the user is not found
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, CustomError.NewError(CustomError.CodeUserNotFound, "User does not exist")
-		}
-		return nil, err
-	}
-	return &user, nil
-}
-
-// GetUserByUsername retrieves a user by their username.
-func (r *userRepo) GetUserByUsername(username string) (*models.User, error) {
-	var user models.User
-	err := r.db.Where("username = ?", username).First(&user).Error
-	if err != nil {
-		// Handle case when the user is not found
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, CustomError.NewError(CustomError.CodeUserNotFound, "User does not exist")
-		}
-		return nil, err
-	}
-	return &user, nil
-}
-
-// User represents the database schema for users.
-type User struct {
-	ID       int    `gorm:"primaryKey;autoIncrement"`
-	Username string `gorm:"unique"` // Unique constraint on username
-	Password string // Hashed password
-}
-
-// UpdateUser updates the user information in the database.
-func (r *userRepo) UpdateUser(user *models.User) error {
-	return r.db.Save(user).Error
-}
-
-// DeleteUser removes a user from the database based on their ID.
-func (r *userRepo) DeleteUser(id int) error {
-	// Use GORM's Delete method to remove the user
-	result := r.db.Delete(&User{}, id)
-	if result.Error != nil {
-		return result.Error
-	}
-
-	// Check if a record was actually deleted
-	if result.RowsAffected == 0 {
-		return CustomError.NewError(CustomError.CodeUserNotFound, "User does not exist")
-	}
-
-	return nil
-}
-
-// UpdatePassword updates a user's password in the database.
-func (r *userRepo) UpdatePassword(id int, password string) error {
-	// Hash the password before storing
-	hashedPassword, err := models.GetHashedPassword(password)
-	if err != nil {
+// CreateUser creates a new user in the database
+func (r *UserRepository) CreateUser(user *models.User) error {
+	var existingUser models.User
+	if err := r.db.Where("username = ?", user.Username).First(&existingUser).Error; err == nil {
+		return errors.NewUserExists("user exists '" + user.Username + "'")
+	} else if err != gorm.ErrRecordNotFound {
 		return err
 	}
 
-	// Execute the database update operation
-	result := r.db.Model(&models.User{}).Where("id = ?", id).Update("password", string(hashedPassword))
-	if result.Error != nil {
-		return result.Error
-	}
-
-	// Check if any record was updated
-	if result.RowsAffected == 0 {
-		return CustomError.NewError(CustomError.CodeUserNotFound, "User not found or password not updated")
+	if err := r.db.Create(user).Error; err != nil {
+		logger.Error(err.Error())
+		return err
 	}
 
 	return nil
+}
+
+// GetUserByID retrieves a user by their ID
+func (r *UserRepository) GetUserByID(id int) (*models.User, error) {
+	var user models.User
+	err := r.db.First(&user, id).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, NewUserNotFound("User not found")
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
+// GetUserByUsername retrieves a user by their username
+func (r *UserRepository) GetUserByUsername(username string) (*models.User, error) {
+	var user *models.User
+	err := r.db.Where("username = ?", username).First(&user).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, NewUserNotFound("User not found")
+		}
+		return nil, err
+	}
+	return user, nil
+}
+
+// UpdatePassword updates a user's password
+func (r *UserRepository) UpdatePassword(userID int, hashedPassword string) error {
+	return r.db.Model(&models.User{}).Where("id = ?", userID).Update("password", hashedPassword).Error
+}
+
+// DeleteUser removes a user from the database
+func (r *UserRepository) DeleteUser(id int) error {
+	return r.db.Delete(&models.User{}, id).Error
 }
